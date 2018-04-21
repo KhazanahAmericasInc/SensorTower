@@ -29,7 +29,7 @@ def main(args):
             os.mkdir(parent_folder)
         if args.query is not None:
             class_name = args.folder_name
-            queries = [args.query]
+            queries = args.query
         else:
             class_name = "dog"
             queries = ["dogs", "pug", "puppy"]
