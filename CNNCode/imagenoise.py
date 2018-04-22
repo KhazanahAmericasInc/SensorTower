@@ -4,10 +4,17 @@ import os
 import cv2
 import numpy as np
 
+###
+# This script takes a list of images and resizes it all to a specific size. It does this by resizing the larger
+# dimension to the required size, and padding the remaining pixels to create a square image. This script then
+# replaces background-like pixels to random colors. This may help the neural network better learn relevant features.
+###
+
 # Split char used in the CSV
 SPLITCHAR = ","
-SIZE = 64
 
+# This function takes an image and a pixel size. It resizes the largest dimension to the desired size and then pads
+# the remaining pixels with padColor to create a square image. It returns the square image.
 def resizeAndPad(img, size, padColor=0):
 
     h, w = img.shape[:2]
@@ -48,8 +55,10 @@ def resizeAndPad(img, size, padColor=0):
 
     return scaled_img
 
-
-def main(arg_dict):
+# Main Function: Takes the input command arguments and reads all the images listed in the image list. It then resizeAndPad and
+# introduce pixel noise. Finally, the images are saved to a new folder.
+def main(args):
+	SIZE = args.image_size
     imagedir = os.path.join(os.getcwd(), args.input_directory)
 
     if not os.path.isdir(imagedir):
@@ -60,6 +69,7 @@ def main(arg_dict):
     if not os.path.isfile(imagelistfile):
         sys.exit("Image list file does not exist: {}".format(imagelistfile))
 
+    # Reading the list file
     annotations = []
     with open(imagelistfile, 'r') as infile:
         annotations = infile.readlines()
@@ -89,11 +99,13 @@ def main(arg_dict):
                 os.mkdir(classdir)
                 
             cv2.imwrite(os.path.join(outdir, annot.strip()),final)
-    
+   
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_list_file", default="scraped/imagelist.csv", help="name of input image list file")
     parser.add_argument("--input_directory", default="scraped", help="name of directory that contains images")
     parser.add_argument("--output_directory", default="resized3", help="name of input image list file")
+    parser.add_argument("--image_size", default=64, type = int, help="size of input images")
     args = parser.parse_args()
     main(args)

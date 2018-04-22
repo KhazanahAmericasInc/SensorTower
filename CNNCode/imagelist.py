@@ -2,11 +2,17 @@ import sys
 import argparse
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 import random
 
-# Split char used in the CSV
-SPLITCHAR = ";"
+### 
+# This script is used to list all the image files in the directory
+# It provides the functionality to shuffle the list and have a maximum sample size
+# This is useful to feed into preprocessing as it summarizes which images will be used
+###
 
+# This function takes a directory and the list of files inside.
+# It creates a csv file inside the directory that lists all the files
 def makecsv(subdir, files):
     csvfile = 'GT_{}.csv'.format(subdir)
     with open(subdir + "/" + csvfile, 'w') as outf:
@@ -15,6 +21,8 @@ def makecsv(subdir, files):
 
     return csvfile
 
+# This is the main function. It takes the parsed dictionary from command arguments
+# It iterates through all subdirectories in the folder to create final summary files
 def main(arg_dict):
 
     # Output data
@@ -25,6 +33,8 @@ def main(arg_dict):
     cwd = os.getcwd()
     subdirs = [subdir for subdir in os.listdir(cwd) if os.path.isdir(subdir)]
     subdirs.sort()
+
+    # Iterates through all subdirectories found
     for subdir in subdirs:
         newcwd = os.path.join(cwd, subdir)
         files = os.listdir(newcwd)
@@ -32,11 +42,13 @@ def main(arg_dict):
         csvfiles = [csvfile for csvfile in files if csvfile.endswith(".csv")]
         print ("In Directory {}".format(subdir))
 
+        # If there are no csv files in the directory, create a new one.
         if len(csvfiles) == 0:
             print ("NOTE: Making csv file for directory {}".format(subdir))
             csvfiles = [makecsv(subdir, files)]
         elif len(csvfiles) > 1:
             print("ERROR: Directory {} has more than one csv file!".format(subdir))
+
         # Parsing csv file(s)
         for csvfile in csvfiles:
             filecontent = None
@@ -59,19 +71,24 @@ def main(arg_dict):
                 else:
                     imagecount[subdir] = 1
 
-    # Writing files
+    # Writing to summary list file
     with open(arg_dict.output_list_file, 'w') as outfile:
         outfile.writelines(imagelist)
 
+    # Writing to the data summary file
     with open(arg_dict.output_summary_file, 'w') as outfile:
         outfile.write("CLASSLABELS = {}\n".format(len(imagecount)))
         outfile.write("CLASS\tNUMIMAGES\n")
         for key in sorted(imagecount.keys()):
             outfile.write("{}\t{}\n".format(key,imagecount[key]))
-    
-    plt.bar([key + " " for key in imagecount.keys()], imagecount.values())
+
+    # Creating the bar graph
+    x = np.arange(len(imagecount.keys()))
+    plt.bar(x, imagecount.values())
+    plt.xticks(x, imagecount.keys())
     plt.savefig(arg_dict.output_class_hist)
-    
+ 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_list_file", default="imagelist.csv", help="name of output image list file")

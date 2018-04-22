@@ -8,14 +8,22 @@ import math
 import time
 import argparse
 
-IMGSIZE = 64
+###
+# This script takes in a binary file that contains all the images and their respective labels and trains 
+# a convolutional neural that classifies the images. It outputs the model into the desired directory. In
+# the directory, there would be multiple files that represent the tensorflow checkpoint and a .pb file 
+# that stores the model weights and structure. It is also possible to reload a checkpoint to resume or
+# further train the network.
+###
+
+# global constants for the script
 VALIDATIONSIZE = 900
-BATCHSIZE = 1
-LEARNINGRATE = 0.0000001
+BATCHSIZE = 100
+LEARNINGRATE = 0.001
 DECAY = 0.9
 NUMEPOCH = 200
 
-### Initializes placeholders
+### Initializes placeholders (containing image data and their labels)
 def input_placeholders(img_shape, num_labels):
     images_pl = tf.placeholder(tf.float32, shape=(None, img_shape[0], img_shape[1], img_shape[2]), name='input')
     labels_pl = tf.placeholder(tf.int32, shape=(None, num_labels))
@@ -24,31 +32,31 @@ def input_placeholders(img_shape, num_labels):
 ### Main network function : builds the graph 
 def inference(x, keep_prob, num_labels):
 
-    # Input is 32x32x3
+    # Input is 64x64x3 
     net = slim.conv2d(x, 32, [3, 3], stride=2, activation_fn=tf.nn.relu6, scope='conv1')      
     net = slim.conv2d(net, 32, [3, 3], stride=1, activation_fn=tf.nn.relu6, scope='conv2')
 
-    # 16x16x32
+    # 32x32x32
     net = slim.conv2d(net, 64, [3, 3], activation_fn=tf.nn.relu6, scope='conv3')      
     net = slim.conv2d(net, 64, [3, 3], activation_fn=tf.nn.relu6, stride=2,  scope='conv4')
 
-    # 8x8x64
+    # 16x16x64
     net = slim.separable_conv2d(net, None, [3, 3], depth_multiplier=1, stride=1, activation_fn=tf.nn.relu6, scope="conv5_depth")
     net = slim.conv2d(net, 64, [1, 1], activation_fn=tf.nn.relu6, scope='conv5_pointwise')
     net = slim.separable_conv2d(net, None, [3, 3], depth_multiplier=1, stride=2, activation_fn=tf.nn.relu6, scope='conv6_depth')
     net = slim.conv2d(net, 128, [1, 1], activation_fn=tf.nn.relu6, scope='conv6_pointwise')
     
-    # 4x4x128
+    # 8x8x128
     net = slim.separable_conv2d(net, None, [3, 3], depth_multiplier=1, stride=1, activation_fn=tf.nn.relu6, scope="conv7_depth")
     net = slim.conv2d(net, 128, [1, 1], activation_fn=tf.nn.relu6, scope='conv7_pointwise')
     net = slim.separable_conv2d(net, None, [3, 3], depth_multiplier=1, stride=2, activation_fn=tf.nn.relu6, scope='conv8_depth')
     net = slim.conv2d(net, 256, [1, 1], activation_fn=tf.nn.relu6, scope='conv8_pointwise')
 
-    # 4x4x128
+    # 4x4x256
     net = slim.separable_conv2d(net, None, [3, 3], depth_multiplier=1, stride=1, activation_fn=tf.nn.relu6, scope="conv9_depth")
-    net = slim.conv2d(net, 128, [1, 1], activation_fn=tf.nn.relu6, scope='conv9_pointwise')
+    net = slim.conv2d(net, 256, [1, 1], activation_fn=tf.nn.relu6, scope='conv9_pointwise')
     net = slim.separable_conv2d(net, None, [3, 3], depth_multiplier=1, stride=2, activation_fn=tf.nn.relu6, scope='conv10_depth')
-    net = slim.conv2d(net, 256, [1, 1], activation_fn=tf.nn.relu6, scope='conv10_pointwise')
+    net = slim.conv2d(net, 512, [1, 1], activation_fn=tf.nn.relu6, scope='conv10_pointwise')
 
     # 2x2x256
     net = slim.max_pool2d(net, [2, 2], scope='Maxpool') 
@@ -78,9 +86,10 @@ def batch_gen(images, labels, batchsize):
 
         yield (np.array(image_out), np.array(label_out))
 
-
+# Main function. Sets up the tensorflow graph and variables. Trains the model with user given data
 def main(args):
 
+	# Name of the output save files.
     OUTSAVE = args.output_directory + "/" + args.output_model_name + ".ckpt"
     OUTMODEL = args.output_directory + "/" + args.output_model_name + ".pb"
 
@@ -171,6 +180,7 @@ def main(args):
         saver = tf.train.Saver()
         stepcount = 0
         start_time = time.time()
+
         ##### Running Training
         for epoch in range(NUMEPOCH):
 
@@ -185,13 +195,15 @@ def main(args):
                 feed_dict = { images_pl : images_batch, labels_pl : labels_batch, keep_prob : 0.5}
                 _, loss_value = sess.run([optimizer, loss], feed_dict=feed_dict)
 
-                #stepcount += 1
+                stepcount += 1
 
                 # Display training status
                 if stepcount % 100 == 0:
                     duration = time.time() - start_time
                     print("Step %d: loss = %.4f. Time Elapsed = %.3f sec" % (stepcount, loss_value, duration))
-                if stepcount % 100 == 0:
+
+                # Once every 1000 steps, display the validation results
+                if stepcount % 1000 == 0:
                     feed_dict = { images_pl : x_v, labels_pl : y_v, keep_prob : 1.0}
                     validation_accuracy = sess.run(accuracy, feed_dict = feed_dict)
                     print("On Validation Dataset: Accuracy = %0.04f" % validation_accuracy)
@@ -202,6 +214,7 @@ def main(args):
                     
         print ("DONE TRAINING")
         #####
+
         # Save results to ckpt
         saver.save(sess, OUTSAVE)
 
@@ -210,6 +223,7 @@ def main(args):
         with tf.gfile.FastGFile(OUTMODEL, 'wb') as f:
             f.write(output_graph_def.SerializeToString())
     #####
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

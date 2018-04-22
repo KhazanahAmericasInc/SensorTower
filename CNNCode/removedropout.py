@@ -6,7 +6,13 @@ from tensorflow.python.framework import graph_util
 from tensorflow.python.tools import optimize_for_inference_lib
 from tensorflow.core.framework import graph_pb2
 
+###
+# This script removes the dropout layers that are used to train the model, but are not necessary to 
+# perform inference. Removing the dropout layers and the input keep_prob variable reduces the model
+# size and makes it easier to port from application to application.
+###
 
+# Main function: Searches through the network graph for layers used for dropout and removes them
 def remove_dropout(args):
     input_model = os.path.join(os.getcwd(), args.model_directory, args.model_file)
     graph = tf.GraphDef()
@@ -17,15 +23,18 @@ def remove_dropout(args):
     first_instance = True
     keep_prob_index = None
 
+    # Read the network graph
     with tf.gfile.Open(input_model, 'rb') as f:
         data = f.read()
         graph.ParseFromString(data)
 
+    # Uncomment to print the network structure before dropout removal
     #for i, node in enumerate(graph.node):
     #    print('%d %s' % (i, node.name))
     #    for j, inputs in enumerate(node.input):
     #        print('--> %d, %s' % (j, inputs))
 
+    # Iterate through the graph keeping track of which nodes to remove
     for i, node in enumerate(graph.node):
         if 'dropout' in node.name:
             if first_instance:
@@ -37,6 +46,7 @@ def remove_dropout(args):
             keep_prob_index = i
         if args.output_node == node.name:
             final_node = i
+
     # Find the input into dropout
     dropout_input = graph.node[dropout_start].input[0]
     
@@ -56,16 +66,19 @@ def remove_dropout(args):
     # Remove keep_prob from graph
     del final_graph[keep_prob_index] 
 
+    # Uncomment to print the network structore after dropout removal
     #for i, node in enumerate(final_graph):
     #    print('%d %s' % (i, node.name))
     #    for j, inputs in enumerate(node.input):
     #        print('--> %d, %s' % (j, inputs))
 
+    # Saves the new model
     output_graph = graph_pb2.GraphDef()
     output_graph.node.extend(final_graph)
     with tf.gfile.GFile(args.output_model_file, 'wb') as f:
         f.write(output_graph.SerializeToString())
             
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_directory", default="output", help="name of directory containing frozen model")
